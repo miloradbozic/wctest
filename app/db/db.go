@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"wctest/app/config"
 )
@@ -13,23 +14,24 @@ type DB struct {
 func InitDB(cfg *config.Config) (*DB, error) {
 	db, err := sql.Open("sqlite3", cfg.DBPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open database: %v", err)
 	}
 
-	createTableSQL := `
-	CREATE TABLE IF NOT EXISTS employees (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		first_name TEXT NOT NULL,
-		last_name TEXT NOT NULL,
-		title TEXT NOT NULL,
-		reports_to_id INTEGER,
-		FOREIGN KEY (reports_to_id) REFERENCES employees(id)
-	);
-	`
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %v", err)
+	}
 
-	_, err = db.Exec(createTableSQL)
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS employees (
+			id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL,
+			title TEXT NOT NULL,
+			manager_id INTEGER,
+			FOREIGN KEY (manager_id) REFERENCES employees(id)
+		)
+	`)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create employees table: %v", err)
 	}
 
 	return &DB{db}, nil

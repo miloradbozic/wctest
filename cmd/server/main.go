@@ -18,10 +18,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-
 	repo := db.NewEmployeeRepository(database)
 	employeeService := service.NewEmployeeService(repo)
-	if err := employeeService.InitializeSampleData(); err != nil {
+	if err := employeeService.InitializeData(); err != nil {
 		log.Fatal(err)
 	}
 

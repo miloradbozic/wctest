@@ -23,65 +23,61 @@ func (r *EmployeeRepository) Cleanup() error {
 
 func (r *EmployeeRepository) Create(employee *model.Employee) error {
 	query := `
-		INSERT INTO employees (first_name, last_name, title, reports_to_id)
+		INSERT INTO employees (id, name, title, manager_id)
 		VALUES (?, ?, ?, ?)
 	`
 
-	var reportsToID *int
-	if employee.ReportsTo != nil {
-		reportsToID = &employee.ReportsTo.ID
-	}
-
-	result, err := r.db.Exec(query, employee.FirstName, employee.LastName, employee.Title, reportsToID)
-	if err != nil {
-		return err
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-
-	employee.ID = int(id)
-	return nil
+	_, err := r.db.Exec(query, 
+		employee.ID,
+		employee.Name, 
+		employee.Title, 
+		employee.ManagerID,
+	)
+	return err
 }
 
+// EmployeeNode represents an employee in the tree structure
 type EmployeeNode struct {
 	Employee model.Employee `json:"employee"`
 	Reports  []EmployeeNode `json:"reports"`
 }
 
 func (r *EmployeeRepository) GetEmployeeTree() ([]EmployeeNode, error) {
+	// Get all employees
 	employees, err := r.GetAll()
 	if err != nil {
 		return nil, err
 	}
 
+	// Create a map of employees by ID
 	employeeMap := make(map[int]*model.Employee)
 	for i := range employees {
 		employeeMap[employees[i].ID] = &employees[i]
 	}
 
+	// Create a map of reports for each employee
 	reportsMap := make(map[int][]*model.Employee)
 	for i := range employees {
 		emp := &employees[i]
-		if emp.ReportsTo != nil {
-			managerID := emp.ReportsTo.ID
+		if emp.ManagerID != nil {
+			managerID := *emp.ManagerID
 			reportsMap[managerID] = append(reportsMap[managerID], emp)
 		}
 	}
 
+	// Sort reports by name
 	for _, reports := range reportsMap {
 		sort.Slice(reports, func(i, j int) bool {
-			return reports[i].LastName < reports[j].LastName
+			return reports[i].Name < reports[j].Name
 		})
 	}
 
+	// Build the tree structure
 	var roots []EmployeeNode
 	for i := range employees {
 		emp := &employees[i]
-		// If the employee has no manager, they are at the root node
-		if emp.ReportsTo == nil || employeeMap[emp.ReportsTo.ID] == nil {
+		// If the employee has no manager, they are a root
+		if emp.ManagerID == nil {
 			root := EmployeeNode{
 				Employee: *emp,
 				Reports:  buildReports(emp.ID, reportsMap),
@@ -112,10 +108,8 @@ func buildReports(managerID int, reportsMap map[int][]*model.Employee) []Employe
 
 func (r *EmployeeRepository) GetAll() ([]model.Employee, error) {
 	query := `
-		SELECT e.id, e.first_name, e.last_name, e.title, 
-		       m.id, m.first_name, m.last_name, m.title
-		FROM employees e
-		LEFT JOIN employees m ON e.reports_to_id = m.id
+		SELECT id, name, title, manager_id
+		FROM employees
 	`
 
 	rows, err := r.db.Query(query)
@@ -125,38 +119,25 @@ func (r *EmployeeRepository) GetAll() ([]model.Employee, error) {
 	defer rows.Close()
 
 	var employees []model.Employee
-	employeeMap := make(map[int]*model.Employee)
-
 	for rows.Next() {
 		var emp model.Employee
 		var managerID sql.NullInt64
-		var managerFirstName, managerLastName, managerTitle sql.NullString
 
 		err := rows.Scan(
 			&emp.ID,
-			&emp.FirstName,
-			&emp.LastName,
+			&emp.Name,
 			&emp.Title,
 			&managerID,
-			&managerFirstName,
-			&managerLastName,
-			&managerTitle,
 		)
 		if err != nil {
 			return nil, err
 		}
 
 		if managerID.Valid {
-			manager := &model.Employee{
-				ID:        int(managerID.Int64),
-				FirstName: managerFirstName.String,
-				LastName:  managerLastName.String,
-				Title:     managerTitle.String,
-			}
-			emp.ReportsTo = manager
+			id := int(managerID.Int64)
+			emp.ManagerID = &id
 		}
 
-		employeeMap[emp.ID] = &emp
 		employees = append(employees, emp)
 	}
 
@@ -165,40 +146,37 @@ func (r *EmployeeRepository) GetAll() ([]model.Employee, error) {
 
 func (r *EmployeeRepository) GetByID(id int) (*model.Employee, error) {
 	query := `
-		SELECT e.id, e.first_name, e.last_name, e.title,
-		       m.id, m.first_name, m.last_name, m.title
-		FROM employees e
-		LEFT JOIN employees m ON e.reports_to_id = m.id
-		WHERE e.id = ?
+		SELECT id, name, title, manager_id
+		FROM employees
+		WHERE id = ?
 	`
 
 	var emp model.Employee
 	var managerID sql.NullInt64
-	var managerFirstName, managerLastName, managerTitle sql.NullString
 
 	err := r.db.QueryRow(query, id).Scan(
 		&emp.ID,
-		&emp.FirstName,
-		&emp.LastName,
+		&emp.Name,
 		&emp.Title,
 		&managerID,
-		&managerFirstName,
-		&managerLastName,
-		&managerTitle,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	if managerID.Valid {
-		manager := &model.Employee{
-			ID:        int(managerID.Int64),
-			FirstName: managerFirstName.String,
-			LastName:  managerLastName.String,
-			Title:     managerTitle.String,
-		}
-		emp.ReportsTo = manager
+		id := int(managerID.Int64)
+		emp.ManagerID = &id
 	}
 
 	return &emp, nil
+}
+
+func (r *EmployeeRepository) IsEmpty() (bool, error) {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM employees").Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count == 0, nil
 } 

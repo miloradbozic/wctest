@@ -1,6 +1,10 @@
 package service
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"wctest/app/db"
 	"wctest/app/model"
 )
@@ -19,41 +23,36 @@ func (s *EmployeeService) GetOrganizationTree() ([]db.EmployeeNode, error) {
 	return s.repo.GetEmployeeTree()
 }
 
-func (s *EmployeeService) InitializeSampleData() error {
-	if err := s.repo.Cleanup(); err != nil {
+func (s *EmployeeService) InitializeData() error {
+	isEmpty, err := s.repo.IsEmpty()
+	if err != nil {
 		return err
 	}
 
-	// Create CEO
-	ceo := &model.Employee{
-		FirstName: "Michael",
-		LastName:  "Chen",
-		Title:     "CEO",
-	}
-	if err := s.repo.Create(ceo); err != nil {
-		return err
+	if !isEmpty {
+		return nil // Database already has data
 	}
 
-	// Create CTO
-	cto := &model.Employee{
-		FirstName: "Barrett",
-		LastName:  "Glasauer",
-		Title:     "CTO",
-		ReportsTo: ceo,
+	resp, err := http.Get("https://gist.githubusercontent.com/chancock09/6d2a5a4436dcd488b8287f3e3e4fc73d/raw/fa47d64c6d5fc860fabd3033a1a4e3c59336324e/employees.json")
+	if err != nil {
+		return fmt.Errorf("failed to fetch data: %v", err)
 	}
-	if err := s.repo.Create(cto); err != nil {
-		return err
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %v", err)
 	}
 
-	// Create COO
-	coo := &model.Employee{
-		FirstName: "Andres",
-		LastName:  "Green",
-		Title:     "COO",
-		ReportsTo: ceo,
+	var employees []model.Employee
+	if err := json.Unmarshal(body, &employees); err != nil {
+		return fmt.Errorf("failed to parse JSON: %v", err)
 	}
-	if err := s.repo.Create(coo); err != nil {
-		return err
+
+	for _, emp := range employees {
+		if err := s.repo.Create(&emp); err != nil {
+			return fmt.Errorf("failed to create employee %s: %v", emp.Name, err)
+		}
 	}
 
 	return nil
