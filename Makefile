@@ -1,67 +1,40 @@
-.PHONY: build test clean deps vendor check-deps update-deps verify-deps clean-deps run dev
+.PHONY: dev prod build-frontend clean deps setup-frontend
 
-# Variables
-BINARY_NAME=wctest
-BUILD_DIR=build
-GO=go
-GOFLAGS=-v
-LDFLAGS=-ldflags "-s -w"
+# Development commands
+dev:
+	@echo "Starting development environment..."
+	@echo "Backend: http://localhost:8080"
+	@echo "Frontend: http://localhost:3000"
+	@echo "Run these commands in separate terminals:"
+	@echo "1. make backend"
+	@echo "2. make frontend"
 
-# Default target
-all: build
-
-# Create build directory
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-# Download dependencies
 deps:
-	$(GO) mod download
-	$(GO) mod tidy
+	go mod download
+	go mod tidy
 
-# Vendor dependencies
-vendor: deps
-	$(GO) mod vendor
+backend: deps
+	go run cmd/server/main.go
 
-# Check for outdated dependencies
-check-deps: deps
-	$(GO) list -u -m all
+setup-frontend:
+	mkdir -p frontend/public frontend/src
+	@if [ ! -f "frontend/package.json" ]; then \
+		echo "Initializing frontend project..."; \
+		cd frontend && npm init -y; \
+		npm install react react-dom react-scripts axios; \
+	fi
 
-# Update all dependencies
-update-deps: deps
-	$(GO) get -u ./...
+frontend: setup-frontend
+	cd frontend && npm start
 
-# Verify dependencies
-verify-deps: deps
-	$(GO) mod verify
+# Production commands
+prod: deps build-frontend
+	go run cmd/server/main.go
 
-# Clean dependencies
-clean-deps:
-	rm -rf vendor/
-	$(GO) clean -modcache
+build-frontend: setup-frontend
+	cd frontend && npm run build
 
-# Build the application
-build: deps $(BUILD_DIR)
-	$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/server
-
-# Run the application
-run: build
-	$(BUILD_DIR)/$(BINARY_NAME)
-
-# Development mode: rebuild and run
-dev: clean build
-	$(BUILD_DIR)/$(BINARY_NAME)
-
-# Run tests
-test: deps
-	$(GO) test $(GOFLAGS) ./...
-
-# Run tests with coverage
-test-coverage: deps
-	$(GO) test $(GOFLAGS) -coverprofile=$(BUILD_DIR)/coverage.out ./...
-	$(GO) tool cover -html=$(BUILD_DIR)/coverage.out
-
-# Clean build artifacts
-clean: clean-deps
-	rm -rf $(BUILD_DIR)
-	rm -f *.db 
+clean:
+	rm -rf frontend/build
+	rm -f employees.db
+	go clean -modcache 
