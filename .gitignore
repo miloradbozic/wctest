@@ -50,3 +50,4 @@ frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/.eslintcache
 frontend/.DS_Store 
+frontend/package-lock.json
