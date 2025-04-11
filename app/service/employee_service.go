@@ -10,12 +10,14 @@ import (
 	"wctest/app/model"
 )
 
+var HTTPGet = http.Get	//make it testable
+
 type EmployeeService struct {
-	repo *db.EmployeeRepository
+	repo db.EmployeeRepository
 	cfg  *config.Config
 }
 
-func NewEmployeeService(repo *db.EmployeeRepository, cfg *config.Config) *EmployeeService {
+func NewEmployeeService(repo db.EmployeeRepository, cfg *config.Config) *EmployeeService {
 	return &EmployeeService{
 		repo: repo,
 		cfg:  cfg,
@@ -36,7 +38,7 @@ func (s *EmployeeService) InitializeData() error {
 		return nil // Database already has data
 	}
 
-	resp, err := http.Get(s.cfg.EmployeesURL)
+	resp, err := HTTPGet(s.cfg.EmployeesURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch data: %v", err)
 	}

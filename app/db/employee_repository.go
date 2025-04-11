@@ -6,22 +6,28 @@ import (
 	"wctest/app/model"
 )
 
-type EmployeeRepository struct {
+type EmployeeRepository interface {
+	GetEmployeeTree() ([]EmployeeNode, error)
+	IsEmpty() (bool, error)
+	Create(employee *model.Employee) error
+} 
+
+type employeeRepository struct {
 	db *DB
 }
 
-func NewEmployeeRepository(db *DB) *EmployeeRepository {
-	return &EmployeeRepository{
+func NewEmployeeRepository(db *DB) EmployeeRepository {
+	return &employeeRepository{
 		db: db,
 	}
 }
 
-func (r *EmployeeRepository) Cleanup() error {
+func (r *employeeRepository) Cleanup() error {
 	_, err := r.db.Exec("DELETE FROM employees")
 	return err
 }
 
-func (r *EmployeeRepository) Create(employee *model.Employee) error {
+func (r *employeeRepository) Create(employee *model.Employee) error {
 	query := `
 		INSERT INTO employees (id, name, title, manager_id)
 		VALUES (?, ?, ?, ?)
@@ -42,7 +48,7 @@ type EmployeeNode struct {
 	Reports  []EmployeeNode `json:"reports"`
 }
 
-func (r *EmployeeRepository) GetEmployeeTree() ([]EmployeeNode, error) {
+func (r *employeeRepository) GetEmployeeTree() ([]EmployeeNode, error) {
 	// Get all employees
 	employees, err := r.GetAll()
 	if err != nil {
@@ -106,7 +112,7 @@ func buildReports(managerID int, reportsMap map[int][]*model.Employee) []Employe
 	return nodes
 }
 
-func (r *EmployeeRepository) GetAll() ([]model.Employee, error) {
+func (r *employeeRepository) GetAll() ([]model.Employee, error) {
 	query := `
 		SELECT id, name, title, manager_id
 		FROM employees
@@ -144,7 +150,7 @@ func (r *EmployeeRepository) GetAll() ([]model.Employee, error) {
 	return employees, nil
 }
 
-func (r *EmployeeRepository) GetByID(id int) (*model.Employee, error) {
+func (r *employeeRepository) GetByID(id int) (*model.Employee, error) {
 	query := `
 		SELECT id, name, title, manager_id
 		FROM employees
@@ -172,7 +178,7 @@ func (r *EmployeeRepository) GetByID(id int) (*model.Employee, error) {
 	return &emp, nil
 }
 
-func (r *EmployeeRepository) IsEmpty() (bool, error) {
+func (r *employeeRepository) IsEmpty() (bool, error) {
 	var count int
 	err := r.db.QueryRow("SELECT COUNT(*) FROM employees").Scan(&count)
 	if err != nil {

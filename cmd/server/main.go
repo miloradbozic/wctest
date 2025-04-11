@@ -10,7 +10,6 @@ import (
 )
 
 func main() {
-	// Load configuration
 	cfg := config.NewConfig()
 
 	// Initialize database
@@ -20,10 +19,7 @@ func main() {
 	}
 	defer database.Close()
 
-	// Create repository
 	repo := db.NewEmployeeRepository(database)
-
-	// Create service
 	employeeService := service.NewEmployeeService(repo, cfg)
 
 	// Initialize data if needed
@@ -31,7 +27,6 @@ func main() {
 		log.Fatalf("Failed to initialize data: %v", err)
 	}
 
-	// Create and start server
 	srv := server.NewServer(employeeService)
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("Server starting on %s", addr)

@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"wctest/app/service"
 )
@@ -16,18 +17,26 @@ func NewServer(employeeService *service.EmployeeService) *Server {
 	}
 }
 
-func (s *Server) getEmployees(w http.ResponseWriter, r *http.Request) {
-	employees, err := s.employeeService.GetOrganizationTree()
+func (s *Server) Start(addr string) error {
+	http.HandleFunc("/employees", s.handleGetEmployees)
+	log.Printf("Server starting on %s", addr)
+	return http.ListenAndServe(addr, nil)
+}
+
+func (s *Server) handleGetEmployees(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tree, err := s.employeeService.GetOrganizationTree()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(employees)
-}
-
-func (s *Server) Start(port int) error {
-	http.HandleFunc("/employees", s.getEmployees)
-	return http.ListenAndServe(":8080", nil)
+	if err := json.NewEncoder(w).Encode(tree); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 } 
