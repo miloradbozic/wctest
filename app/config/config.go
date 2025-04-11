@@ -1,15 +1,27 @@
 package config
 
+import (
+	"fmt"
+	"os"
+	"gopkg.in/yaml.v3"
+)
+
 type Config struct {
-	DBPath       string
-	Port         int
-	EmployeesURL string
+	DBPath       string `yaml:"db_path"`
+	Port         int    `yaml:"port"`
+	EmployeesURL string `yaml:"employees_url"`
 }
 
-func NewConfig() *Config {
-	return &Config{
-		DBPath:       "employees.db",
-		Port:         8080,
-		EmployeesURL: "https://gist.githubusercontent.com/chancock09/6d2a5a4436dcd488b8287f3e3e4fc73d/raw/fa47d64c6d5fc860fabd3033a1a4e3c59336324e/employees.json",
+func NewConfig() (*Config, error) {
+	data, err := os.ReadFile("config.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
+
+	cfg := &Config{}
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, fmt.Errorf("error parsing config file: %w", err)
+	}
+
+	return cfg, nil
 } 
