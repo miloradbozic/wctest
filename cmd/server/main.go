@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"wctest/app/config"
 	"wctest/app/db"
@@ -10,21 +11,31 @@ import (
 
 func main() {
 	// Load configuration
-	cfg := config.LoadConfig()
+	cfg := config.NewConfig()
 
 	// Initialize database
 	database, err := db.InitDB(cfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
+	defer database.Close()
 
+	// Create repository
 	repo := db.NewEmployeeRepository(database)
-	employeeService := service.NewEmployeeService(repo)
+
+	// Create service
+	employeeService := service.NewEmployeeService(repo, cfg)
+
+	// Initialize data if needed
 	if err := employeeService.InitializeData(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to initialize data: %v", err)
 	}
 
+	// Create and start server
 	srv := server.NewServer(employeeService)
-	log.Printf("Server starting on port %d...", cfg.Port)
-	log.Fatal(srv.Start(cfg.Port))
+	addr := fmt.Sprintf(":%d", cfg.Port)
+	log.Printf("Server starting on %s", addr)
+	if err := srv.Start(addr); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }

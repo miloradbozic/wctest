@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"wctest/app/config"
 	"wctest/app/db"
 	"wctest/app/model"
 )
 
 type EmployeeService struct {
 	repo *db.EmployeeRepository
+	cfg  *config.Config
 }
 
-func NewEmployeeService(repo *db.EmployeeRepository) *EmployeeService {
+func NewEmployeeService(repo *db.EmployeeRepository, cfg *config.Config) *EmployeeService {
 	return &EmployeeService{
 		repo: repo,
+		cfg:  cfg,
 	}
 }
 
@@ -33,7 +36,7 @@ func (s *EmployeeService) InitializeData() error {
 		return nil // Database already has data
 	}
 
-	resp, err := http.Get("https://gist.githubusercontent.com/chancock09/6d2a5a4436dcd488b8287f3e3e4fc73d/raw/fa47d64c6d5fc860fabd3033a1a4e3c59336324e/employees.json")
+	resp, err := http.Get(s.cfg.EmployeesURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch data: %v", err)
 	}
