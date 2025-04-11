@@ -12,14 +12,15 @@ import (
 
 func getEmployees(w http.ResponseWriter, r *http.Request) {
 	repo := db.NewEmployeeRepository()
-	employees, err := repo.GetAll()
+	
+	employeeTree, err := repo.GetEmployeeTree()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(employees)
+	json.NewEncoder(w).Encode(employeeTree)
 }
 
 func main() {

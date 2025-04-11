@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"sort"
 	"wctest/app/model"
 )
 
@@ -43,6 +44,70 @@ func (r *EmployeeRepository) Create(employee *model.Employee) error {
 
 	employee.ID = int(id)
 	return nil
+}
+
+type EmployeeNode struct {
+	Employee model.Employee `json:"employee"`
+	Reports  []EmployeeNode `json:"reports"`
+}
+
+func (r *EmployeeRepository) GetEmployeeTree() ([]EmployeeNode, error) {
+	employees, err := r.GetAll()
+	if err != nil {
+		return nil, err
+	}
+
+	employeeMap := make(map[int]*model.Employee)
+	for i := range employees {
+		employeeMap[employees[i].ID] = &employees[i]
+	}
+
+	reportsMap := make(map[int][]*model.Employee)
+	for i := range employees {
+		emp := &employees[i]
+		if emp.ReportsTo != nil {
+			managerID := emp.ReportsTo.ID
+			reportsMap[managerID] = append(reportsMap[managerID], emp)
+		}
+	}
+
+	for _, reports := range reportsMap {
+		sort.Slice(reports, func(i, j int) bool {
+			return reports[i].LastName < reports[j].LastName
+		})
+	}
+
+	var roots []EmployeeNode
+	for i := range employees {
+		emp := &employees[i]
+		// If the employee has no manager, they are at the root node
+		if emp.ReportsTo == nil || employeeMap[emp.ReportsTo.ID] == nil {
+			root := EmployeeNode{
+				Employee: *emp,
+				Reports:  buildReports(emp.ID, reportsMap),
+			}
+			roots = append(roots, root)
+		}
+	}
+
+	return roots, nil
+}
+
+func buildReports(managerID int, reportsMap map[int][]*model.Employee) []EmployeeNode {
+	reports := reportsMap[managerID]
+	if reports == nil {
+		return nil
+	}
+
+	var nodes []EmployeeNode
+	for _, emp := range reports {
+		node := EmployeeNode{
+			Employee: *emp,
+			Reports:  buildReports(emp.ID, reportsMap),
+		}
+		nodes = append(nodes, node)
+	}
+	return nodes
 }
 
 func (r *EmployeeRepository) GetAll() ([]model.Employee, error) {
