@@ -13,10 +13,3 @@ type Employee struct {
 func (e *Employee) FullName() string {
 	return fmt.Sprintf("%s %s", e.FirstName, e.LastName)
 }
-
-func (e *Employee) ReportsToName() string {
-	if e.ReportsTo == nil {
-		return ""
-	}
-	return e.ReportsTo.FullName()
-}

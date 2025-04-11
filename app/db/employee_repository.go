@@ -7,12 +7,12 @@ import (
 )
 
 type EmployeeRepository struct {
-	db *sql.DB
+	db *DB
 }
 
-func NewEmployeeRepository() *EmployeeRepository {
+func NewEmployeeRepository(db *DB) *EmployeeRepository {
 	return &EmployeeRepository{
-		db: DB,
+		db: db,
 	}
 }
 

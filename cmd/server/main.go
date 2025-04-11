@@ -1,75 +1,31 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
-	"net/http"
-
+	"wctest/app/config"
 	"wctest/app/db"
-	"wctest/app/model"
+	"wctest/app/server"
+	"wctest/app/service"
 )
 
-func getEmployees(w http.ResponseWriter, r *http.Request) {
-	repo := db.NewEmployeeRepository()
-	
-	employeeTree, err := repo.GetEmployeeTree()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(employeeTree)
-}
-
 func main() {
-	err := db.InitDB(true)
+	// Load configuration
+	cfg := config.LoadConfig()
+
+	// Initialize database
+	database, err := db.InitDB(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	repo := db.NewEmployeeRepository()
-	
-	err = repo.Cleanup()
-	if err != nil {
-		log.Fatal(err)
-	}
-	
-	ceo := &model.Employee{
-		FirstName: "Michael",
-		LastName:  "Chen",
-		Title:     "CEO",
-	}
-	err = repo.Create(ceo)
-	if err != nil {
+
+	repo := db.NewEmployeeRepository(database)
+	employeeService := service.NewEmployeeService(repo)
+	if err := employeeService.InitializeSampleData(); err != nil {
 		log.Fatal(err)
 	}
 
-	cto := &model.Employee{
-		FirstName: "Barrett",
-		LastName:  "Glasauer",
-		Title:     "CTO",
-		ReportsTo: ceo,
-	}
-	err = repo.Create(cto)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	coo := &model.Employee{
-		FirstName: "Andres",
-		LastName:  "Green",
-		Title:     "COO",
-		ReportsTo: ceo,
-	}
-	err = repo.Create(coo)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	http.HandleFunc("/employees", getEmployees)
-	
-	fmt.Println("Server starting on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	srv := server.NewServer(employeeService)
+	log.Printf("Server starting on port %d...", cfg.Port)
+	log.Fatal(srv.Start(cfg.Port))
 }
